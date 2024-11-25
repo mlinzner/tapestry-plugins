@@ -1,0 +1,8 @@
+{
+    "name": "nl.upstart-it.com.feedbin",
+    "version": "1.0.0",
+    "scripts": {
+        "ship": "cd ./src && zip -r ../dist/Feedbin.zip * && mv ../dist/Feedbin.zip ../dist/Feedbin.tapestry"
+    },
+    "dependencies": {}
+}

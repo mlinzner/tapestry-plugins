@@ -1,0 +1,11 @@
+{
+	"id": "nl.upstart-it.com.feedbin",
+	"display_name": "Feedbin",
+	"item_style": "article",
+	"icon": "https://assets.feedbin.com/assets-site/images/apps/feedbin-ios.png",
+	"site": "https://www.feedbin.com",
+	"provides_attachments": false,
+	"needs_verification": true,
+	"verify_variables": true,
+	"check_interval": 900
+}

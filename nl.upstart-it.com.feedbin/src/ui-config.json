@@ -1,0 +1,18 @@
+{
+	"inputs": [
+		{
+			"name": "username",
+			"type": "text"
+		},
+		{
+			"name": "password",
+			"type": "text"
+		},
+		{
+			"name": "fetchUnreadOnly",
+			"type": "switch",
+			"prompt": "Fetch unread items only",
+			"value": "on"
+		}
+	]
+}
