@@ -1,0 +1,27 @@
+name: Upload Tapestry Plugins
+on:
+  release:
+    types: [created]
+permissions:
+  contents: write
+jobs:
+  upload-plugins:
+    name: Upload Tapestry Plugins to Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Create Archives
+        run: |
+          for dir in */; do
+            if [[ -f "$dir/plugin-config.json" ]]; then
+              dir_name="${dir%/}"
+              output_file="${dir_name}.tapestry"
+              (cd "$dir" && zip -qr "../$output_file" .)
+            fi
+          done
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: '*.tapestry'
