@@ -38,25 +38,22 @@ async function load() {
     requestParams += `&read=false`;
   }
 
-  // Feedbin is providing pagination information via response headers, which we don't have access to.
-  // The current implemention is therefore querying pages for as long as the API returns an error (which is usually HTTP 404) indicating that this page doesn't exist anymore.
-  let more = true;
-  let page = 0;
   let newEntries = [];
+  let url = HOST + `/entries.json?${requestParams}&page=1`;
 
-  while (more) {
-    page += 1;
-
+  while (url) {
     try {
-      let entries = await sendRequest(
-        HOST + `/entries.json?${requestParams}&page=${page}`,
-        "GET",
-        null,
-        requestHeaders
-      );
-      newEntries.push(...JSON.parse(entries));
+      console.debug(`Requesting ${url}`);
+      const resp = await sendRequest(url, "GET", null, requestHeaders, true);
+      const parsedResponse = JSON.parse(resp);
+      const { headers, body, ...rest } = parsedResponse;
+      console.debug(`Response Status is ${rest.status}`);
+      newEntries.push(...JSON.parse(body));
+
+      url = parseLinkHeader(headers?.links).next || null;
     } catch (error) {
-      more = false;
+      console.error(`Error while requesting page from API`);
+      url = null;
     }
   }
 
@@ -72,6 +69,7 @@ async function load() {
 }
 
 function processNewItem(feedItem) {
+  console.debug(`Processing new Item with url ${feedItem.url}`);
   // Basic Information
   let item = Item.createWithUriDate(
     feedItem.url,
@@ -198,4 +196,22 @@ function isOlderThanOneDay(date) {
 function getHostname(url) {
   const matches = url.match(/^(?:https?:\/\/)?([^\/:?#]+)(?:[\/:?#]|$)/i);
   return matches && matches[1];
+}
+
+function parseLinkHeader(header) {
+  if (!header || header.length === 0) return {};
+
+  const parts = header.split(",");
+  const links = {};
+
+  parts.forEach((part) => {
+    const section = part.split(";");
+    if (section.length !== 2) return;
+
+    const url = section[0].trim().replace(/^<|>$/g, "");
+    const rel = section[1].trim().replace(/^rel="|"$/g, "");
+    links[rel] = url;
+  });
+
+  return links;
 }
