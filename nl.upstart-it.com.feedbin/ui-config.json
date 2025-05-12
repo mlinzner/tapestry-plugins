@@ -12,7 +12,7 @@
 			"name": "fetchUnreadOnly",
 			"type": "switch",
 			"prompt": "Fetch unread items only",
-			"value": "on"
+			"value": "off"
 		}
 	]
 }

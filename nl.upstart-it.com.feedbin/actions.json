@@ -1,0 +1,24 @@
+{
+    "items": [
+        {
+            "id": "read",
+            "name": "Mark as Read",
+            "icon": "eye"
+        },
+        {
+            "id": "unread",
+            "name": "Mark as Unread",
+            "icon": "eye.fill"
+        },
+        {
+            "id": "star",
+            "name": "Star",
+            "icon": "tapestry.star"
+        },
+        {
+            "id": "unstar",
+            "name": "Unstar",
+            "icon": "tapestry.star.fill"
+        }
+    ]
+}

@@ -21,6 +21,8 @@ function verify() {
 async function load() {
   if (lastUpdate === null) {
     lastUpdate = new Date(new Date().getTime() - 7 * 24 * 60 * 60 * 1000); // Initial fetch: Looking back to maximum 7 days.
+  } else {
+    lastUpdate = new Date(lastUpdate - 4 * 60 * 60 * 1000); // lastUpdate - 4 hours to update items recently interacted with in a different app
   }
 
   if (
@@ -31,8 +33,27 @@ async function load() {
     lastSubscriptionUpdate = new Date();
   }
 
-  let requestHeaders = AUTH_HEADERS;
   let requestParams = `since=${formatDateToISOWithMicroseconds(lastUpdate)}`;
+
+  // Fetch current list of starred entries
+  const starred = await sendRequest(
+    `${HOST}/starred_entries.json`,
+    "GET",
+    null,
+    AUTH_HEADERS,
+    true
+  );
+  const parsedStarred = JSON.parse(starred);
+
+  // Fetch current list of unread entries
+  const unread = await sendRequest(
+    `${HOST}/unread_entries.json`,
+    "GET",
+    null,
+    AUTH_HEADERS,
+    true
+  );
+  const parsedUnread = JSON.parse(unread);
 
   if (fetchUnreadOnly === "on") {
     requestParams += `&read=false`;
@@ -43,13 +64,10 @@ async function load() {
 
   while (url) {
     try {
-      console.debug(`Requesting ${url}`);
-      const resp = await sendRequest(url, "GET", null, requestHeaders, true);
+      const resp = await sendRequest(url, "GET", null, AUTH_HEADERS, true);
       const parsedResponse = JSON.parse(resp);
       const { headers, body, ...rest } = parsedResponse;
-      console.debug(`Response Status is ${rest.status}`);
       newEntries.push(...JSON.parse(body));
-
       url = parseLinkHeader(headers?.links).next || null;
     } catch (error) {
       console.error(`Error while requesting page from API`);
@@ -61,15 +79,105 @@ async function load() {
   newEntries
     .filter((feedItem) => feedItem?.url !== undefined)
     .map((feedItem) => {
-      items.push(processNewItem(feedItem));
+      items.push(
+        processNewItem(
+          feedItem,
+          JSON.parse(parsedStarred.body),
+          JSON.parse(parsedUnread.body)
+        )
+      );
     });
   processResults(items);
 
   lastUpdate = new Date();
 }
 
-function processNewItem(feedItem) {
-  console.debug(`Processing new Item with url ${feedItem.url}`);
+function performAction(actionId, actionValue, item) {
+  let actions = item.actions;
+
+  if (actionId == "star") {
+    // Mark as Starred
+    sendRequest(
+      HOST + `/starred_entries.json`,
+      "POST",
+      JSON.stringify({ starred_entries: [actionValue] }),
+      AUTH_HEADERS,
+      true
+    )
+      .then((_) => {
+        delete actions["star"];
+        actions["unstar"] = actionValue;
+
+        item.actions = actions;
+        actionComplete(item, null);
+      })
+      .catch((error) => {
+        actionComplete(null, error);
+      });
+  } else if (actionId == "unstar") {
+    // Remove Star
+    sendRequest(
+      HOST + `/starred_entries/delete.json`,
+      "POST",
+      JSON.stringify({ starred_entries: [actionValue] }),
+      AUTH_HEADERS,
+      true
+    )
+      .then((_) => {
+        delete actions["unstar"];
+        actions["star"] = actionValue;
+
+        item.actions = actions;
+        actionComplete(item, null);
+      })
+      .catch((error) => {
+        actionComplete(null, error);
+      });
+  } else if (actionId == "read") {
+    // Mark as read
+    sendRequest(
+      HOST + `/unread_entries.json`,
+      "POST",
+      JSON.stringify({ unread_entries: [actionValue] }),
+      AUTH_HEADERS,
+      true
+    )
+      .then((_) => {
+        delete actions["read"];
+        actions["unread"] = actionValue;
+
+        item.actions = actions;
+        actionComplete(item, null);
+      })
+      .catch((error) => {
+        actionComplete(null, error);
+      });
+  } else if (actionId == "unread") {
+    // Mark as unread
+    sendRequest(
+      HOST + `/unread_entries/delete.json`,
+      "POST",
+      JSON.stringify({ unread_entries: [actionValue] }),
+      AUTH_HEADERS,
+      true
+    )
+      .then((_) => {
+        delete actions["unread"];
+        actions["read"] = actionValue;
+
+        item.actions = actions;
+        actionComplete(item, null);
+      })
+      .catch((error) => {
+        actionComplete(null, error);
+      });
+  } else {
+    let error = new Error(`actionId "${actionId}" not implemented`);
+    actionComplete(null, error);
+  }
+}
+
+function processNewItem(feedItem, starredEntries = [], unreadEntries = []) {
   // Basic Information
   let item = Item.createWithUriDate(
     feedItem.url,
@@ -103,6 +211,23 @@ function processNewItem(feedItem) {
     item.annotations = [annotation];
   }
 
+  // Actions
+  let actions = {};
+
+  if (starredEntries.includes(feedItem.id)) {
+    actions["unstar"] = feedItem.id;
+  } else {
+    actions["star"] = feedItem.id;
+  }
+
+  if (unreadEntries.includes(feedItem.id)) {
+    actions["unread"] = feedItem.id;
+  } else {
+    actions["read"] = feedItem.id;
+  }
+
+  item.actions = actions;
+  console.log("Finish processing");
   return item;
 }
 
