@@ -3,6 +3,6 @@ models:
         data: [
             {
             "host": "news.ycombinator.com",
-            "url": "https:\/\/favicons.feedbinusercontent.com\/eea\/eea17bdff8e6c9321295f5f4dfada55f3330771c.png"
+            "url": "https:/favicons.feedbinusercontent.com/eea/eea17bdff8e6c9321295f5f4dfada55f3330771c.png"
             }
         ]
