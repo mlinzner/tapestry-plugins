@@ -1,6 +1,4 @@
 {
-    "starred_entries.json": [],
-    "unread_entries.json": [],
     "entries.json": [
         {
             "id": 4845639620,
@@ -45,8 +43,6 @@
             "url": "https:\/\/favicons.feedbinusercontent.com\/eea\/eea17bdff8e6c9321295f5f4dfada55f3330771c.png"
         }
     ],
-    "starred_entries/delete.json": {},
-    "unread_entries/delete.json": {},
     "subscriptions.json": [
         {
             "id": 7751112,
@@ -56,6 +52,5 @@
             "feed_url": "https:\/\/hnrss.org\/frontpage",
             "site_url": "https:\/\/news.ycombinator.com\/"
         }
-    ],
-    "authentication.json": {}
+    ]
 }
