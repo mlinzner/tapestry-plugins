@@ -18,78 +18,91 @@ function verify() {
     });
 }
 
-async function load() {
+function load() {
+  console.log("--- LOAD ---");
   if (lastUpdate === null) {
     lastUpdate = new Date(new Date().getTime() - 7 * 24 * 60 * 60 * 1000); // Initial fetch: Looking back to maximum 7 days.
   } else {
     lastUpdate = new Date(lastUpdate - 4 * 60 * 60 * 1000); // lastUpdate - 4 hours to update items recently interacted with in a different app
   }
 
+  console.log(`Looking for items after ${lastUpdate}`);
+
   if (
     lastSubscriptionUpdate === null ||
     isOlderThanOneDay(lastSubscriptionUpdate)
   ) {
-    await updateSubscriptions();
+    updateSubscriptions();
     lastSubscriptionUpdate = new Date();
   }
 
   let requestParams = `since=${formatDateToISOWithMicroseconds(lastUpdate)}`;
 
-  // Fetch current list of starred entries
-  const starred = await sendRequest(
-    `${HOST}/starred_entries.json`,
-    "GET",
-    null,
-    AUTH_HEADERS,
-    true
-  );
-  const parsedStarred = JSON.parse(starred);
+  Promise.all([
+    sendRequest(
+      `${HOST}/starred_entries.json`,
+      "GET",
+      null,
+      AUTH_HEADERS,
+      true
+    ),
+    sendRequest(`${HOST}/unread_entries.json`, "GET", null, AUTH_HEADERS, true),
+  ])
+    .then((response) => {
+      const parsedStarred = JSON.parse(response[0]);
+      const parsedUnread = JSON.parse(response[1]);
 
-  // Fetch current list of unread entries
-  const unread = await sendRequest(
-    `${HOST}/unread_entries.json`,
-    "GET",
-    null,
-    AUTH_HEADERS,
-    true
-  );
-  const parsedUnread = JSON.parse(unread);
+      if (fetchUnreadOnly === "on") {
+        requestParams += `&read=false`;
+      }
 
-  if (fetchUnreadOnly === "on") {
-    requestParams += `&read=false`;
-  }
+      let url = HOST + `/entries.json?${requestParams}&page=1`;
 
-  let newEntries = [];
-  let url = HOST + `/entries.json?${requestParams}&page=1`;
-
-  while (url) {
-    try {
-      const resp = await sendRequest(url, "GET", null, AUTH_HEADERS, true);
-      const parsedResponse = JSON.parse(resp);
-      const { headers, body, ...rest } = parsedResponse;
-      newEntries.push(...JSON.parse(body));
-      url = parseLinkHeader(headers?.links).next || null;
-    } catch (error) {
-      console.error(`Error while requesting page from API`);
-      url = null;
-    }
-  }
-
-  let items = [];
-  newEntries
-    .filter((feedItem) => feedItem?.url !== undefined)
-    .map((feedItem) => {
-      items.push(
-        processNewItem(
-          feedItem,
-          JSON.parse(parsedStarred.body),
-          JSON.parse(parsedUnread.body)
-        )
-      );
+      fetchAllItems(url)
+        .then((newItems) => {
+          let items = [];
+          newItems
+            .filter((feedItem) => feedItem?.url !== undefined)
+            .map((feedItem) => {
+              items.push(
+                processNewItem(
+                  feedItem,
+                  JSON.parse(parsedStarred.body),
+                  JSON.parse(parsedUnread.body)
+                )
+              );
+            });
+          processResults(items);
+          lastUpdate = new Date();
+        })
+        .catch((requestError) => {
+          processError(requestError);
+        });
+    })
+    .catch((requestError) => {
+      processError(requestError);
     });
-  processResults(items);
+}
 
-  lastUpdate = new Date();
+function fetchAllItems(url, results = []) {
+  return sendRequest(url, "GET", null, AUTH_HEADERS, true)
+    .then((response) => {
+      const parsedResponse = JSON.parse(response);
+      const { headers, body, ...rest } = parsedResponse;
+      const combinedResults = results.concat(...JSON.parse(body));
+      const nextPageUrl = parseLinkHeader(headers?.links).next || null;
+
+      if (nextPageUrl) {
+        // Recursive call to fetch the next page
+        return fetchAllItems(nextPageUrl, combinedResults);
+      } else {
+        // No more pages, return combined results
+        return combinedResults;
+      }
+    })
+    .catch((requestError) => {
+      processError(requestError);
+    });
 }
 
 function performAction(actionId, actionValue, item) {
@@ -231,7 +244,8 @@ function processNewItem(feedItem, starredEntries = [], unreadEntries = []) {
   return item;
 }
 
-async function updateSubscriptions() {
+function updateSubscriptions() {
+  console.log(`--- UpdateSubscriptions ---`);
   const subscriptionUpdateHeaders = AUTH_HEADERS;
   let requestParams = "";
   if (lastSubscriptionUpdate !== null) {
@@ -240,34 +254,41 @@ async function updateSubscriptions() {
     )}`;
   }
 
-  const icons = await sendRequest(
-    `${HOST}/icons.json?${requestParams}`,
-    "GET",
-    null,
-    subscriptionUpdateHeaders
-  );
-  const parsedIcons = JSON.parse(icons);
-
-  const subscriptions = await sendRequest(
-    `${HOST}/subscriptions.json?${requestParams}`,
-    "GET",
-    null,
-    subscriptionUpdateHeaders
-  );
-  const parsedSubscriptions = JSON.parse(subscriptions);
-  parsedSubscriptions.map((subscription) => {
-    const host = getHostname(subscription.site_url);
-    setItem(
-      `feed-${subscription.feed_id}`,
-      JSON.stringify({
-        icon:
-          host !== null
-            ? parsedIcons.filter((icon) => icon.host === host)?.[0]?.url
-            : null,
-        ...subscription,
-      })
-    );
-  });
+  Promise.all([
+    sendRequest(
+      `${HOST}/icons.json?${requestParams}`,
+      "GET",
+      null,
+      subscriptionUpdateHeaders
+    ),
+    sendRequest(
+      `${HOST}/subscriptions.json?${requestParams}`,
+      "GET",
+      null,
+      subscriptionUpdateHeaders
+    ),
+  ])
+    .then((response) => {
+      const parsedIcons = JSON.parse(response[0]);
+      const parsedSubscriptions = JSON.parse(response[1]);
+      parsedSubscriptions.map((subscription) => {
+        const host = getHostname(subscription.site_url);
+        console.log(`Caching ${host} [feed-${subscription.feed_id}]`);
+        setItem(
+          `feed-${subscription.feed_id}`,
+          JSON.stringify({
+            icon:
+              host !== null
+                ? parsedIcons.filter((icon) => icon.host === host)?.[0]?.url
+                : null,
+            ...subscription,
+          })
+        );
+      });
+    })
+    .catch((requestError) => {
+      processError(requestError);
+    });
 }
 
 function toBase64(input) {
