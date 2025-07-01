@@ -1,0 +1,61 @@
+{
+    "starred_entries.json": [],
+    "unread_entries.json": [],
+    "entries.json": [
+        {
+            "id": 4845639620,
+            "feed_id": 1289200,
+            "title": "VPN providers in France ordered to block pirate sports IPTV",
+            "author": "gasull",
+            "summary": "Article URL: torrentfreak.com\/major-vpn-providers-or\u2026 Comments URL: news.ycombinator.com\/item?id=44201857 Points: 93 # Comments: 65",
+            "content": "<p>Article URL: <a href=\"https:\/\/torrentfreak.com\/major-vpn-providers-ordered-to-block-pirate-sports-streaming-sites-250516\/\">torrentfreak.com\/major-vpn-providers-or\u2026<\/a><\/p>\n<p>Comments URL: <a href=\"https:\/\/news.ycombinator.com\/item?id=44201857\">news.ycombinator.com\/item?id=44201857<\/a><\/p>\n<p>Points: 93<\/p>\n<p># Comments: 65<\/p>",
+            "url": "https:\/\/torrentfreak.com\/major-vpn-providers-ordered-to-block-pirate-sports-streaming-sites-250516\/",
+            "extracted_content_url": "",
+            "published": "2025-06-06T15:31:18.000000Z",
+            "created_at": "2025-06-06T16:10:37.840117Z"
+        },
+        {
+            "id": 4845386817,
+            "feed_id": 1289200,
+            "title": "Freight rail fueled a new luxury overnight train startup",
+            "author": "Ozarkian",
+            "summary": "Article URL: www.freightwaves.com\/news\/how-freight-r\u2026 Comments URL: news.ycombinator.com\/item?id=44199005 Points: 35 # Comments: 46",
+            "content": "<p>Article URL: <a href=\"https:\/\/www.freightwaves.com\/news\/how-freight-rail-fueled-a-new-luxury-overnight-train-startup\">www.freightwaves.com\/news\/how-freight-r\u2026<\/a><\/p>\n<p>Comments URL: <a href=\"https:\/\/news.ycombinator.com\/item?id=44199005\">news.ycombinator.com\/item?id=44199005<\/a><\/p>\n<p>Points: 35<\/p>\n<p># Comments: 46<\/p>",
+            "url": "https:\/\/www.freightwaves.com\/news\/how-freight-rail-fueled-a-new-luxury-overnight-train-startup",
+            "extracted_content_url": "",
+            "published": "2025-06-06T08:57:38.000000Z",
+            "created_at": "2025-06-06T11:40:05.812516Z"
+        },
+        {
+            "id": 4844586097,
+            "feed_id": 1289200,
+            "title": "Why does Apple make a minority of developers finance the entire App Store?",
+            "author": "walterbell",
+            "summary": "Article URL: lapcatsoftware.com\/articles\/2025\/6\/1.ht\u2026 Comments URL: news.ycombinator.com\/item?id=44193782 Points: 31 # Comments: 37",
+            "content": "<p>Article URL: <a href=\"https:\/\/lapcatsoftware.com\/articles\/2025\/6\/1.html\">lapcatsoftware.com\/articles\/2025\/6\/1.ht\u2026<\/a><\/p>\n<p>Comments URL: <a href=\"https:\/\/news.ycombinator.com\/item?id=44193782\">news.ycombinator.com\/item?id=44193782<\/a><\/p>\n<p>Points: 31<\/p>\n<p># Comments: 37<\/p>",
+            "url": "https:\/\/lapcatsoftware.com\/articles\/2025\/6\/1.html",
+            "extracted_content_url": "",
+            "published": "2025-06-05T17:26:34.000000Z",
+            "created_at": "2025-06-05T18:11:41.976412Z"
+        }
+    ],
+    "icons.json": [
+        {
+            "host": "news.ycombinator.com",
+            "url": "https:\/\/favicons.feedbinusercontent.com\/eea\/eea17bdff8e6c9321295f5f4dfada55f3330771c.png"
+        }
+    ],
+    "starred_entries/delete.json": {},
+    "unread_entries/delete.json": {},
+    "subscriptions.json": [
+        {
+            "id": 7751112,
+            "created_at": "2023-07-22T08:54:22.891280Z",
+            "feed_id": 1289200,
+            "title": "Hacker News: Front Page",
+            "feed_url": "https:\/\/hnrss.org\/frontpage",
+            "site_url": "https:\/\/news.ycombinator.com\/"
+        }
+    ],
+    "authentication.json": {}
+}
