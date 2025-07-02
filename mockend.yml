@@ -5,11 +5,11 @@ models:
       id: { int: [1000, 9999] }
       feed_id: { int: [1, 50] }
       title: { loremWords: [3, 8] }
-      author: fullName
+      author: name
       summary: loremParagraphs
       content: loremParagraphs
       url: URL
-      extracted_content_url: url
+      extracted_content_url: URL
       published: { dateTime: [2025-06-01, 2025-07-01] }
       created_at: { dateTime: [2025-06-01, 2024-07-01] }
     
