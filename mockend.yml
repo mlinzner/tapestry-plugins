@@ -7,7 +7,10 @@ models:
       title: { loremWords: [3, 8] }
       author: name
       summary: { loremParagraphs: [12, 480]}
-      content: { loremParagraphs: [12000, 48000]}
+      content: "<p>Article URL: <a href="https://www.freightwaves.com/news/how-freight-rail-fueled-a-new-luxury-overnight-train-startup">www.freightwaves.com/news/how-freight-r…</a></p>
+<p>Comments URL: <a href="https://news.ycombinator.com/item?id=44199005">news.ycombinator.com/item?id=44199005</a></p>
+<p>Points: 35</p>
+<p># Comments: 46</p>"
       url: URL
       extracted_content_url: URL
       published: { dateTime: [2025-06-01, 2025-07-01] }
