@@ -7,11 +7,14 @@ models:
       title: { loremWords: [3, 8] }
       author: name
       summary: { loremParagraphs: [12, 480]}
-      content: "<p>Article URL: www.freightwaves.com/news/how-freight-r…</p><p>Comments URL: news.ycombinator.com/item?id=44199005</p><p>Points: 35</p><p># Comments: 46</p>"
+      content: { loremParagraphs: [400, 10000]}
       url: URL
       extracted_content_url: URL
       published: { dateTime: [2025-06-01, 2025-07-01] }
       created_at: { dateTime: [2025-06-01, 2024-07-01] }
+    data: [
+      { content: "<p>Article URL: www.freightwaves.com/news/how-freight-r…</p><p>Comments URL: news.ycombinator.com/item?id=44199005</p><p>Points: 35</p><p># Comments: 46</p>"}
+    ]
     
   Subscription:
     fake:
