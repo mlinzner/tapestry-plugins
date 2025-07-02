@@ -8,7 +8,7 @@ models:
       author: fullName
       summary: loremParagraphs
       content: loremParagraphs
-      url: url
+      url: URL
       extracted_content_url: url
       published: { dateTime: [2025-06-01, 2025-07-01] }
       created_at: { dateTime: [2025-06-01, 2024-07-01] }
@@ -20,8 +20,8 @@ models:
       feed_id: { int: [1, 50] }
       created_at: { dateTime: [2023-01-01, 2024-12-31] }
       title: { loremWords: [2, 5] }
-      feed_url: url
-      site_url: url
+      feed_url: URL
+      site_url: URL
       
   Feed:
     fake:
@@ -29,8 +29,8 @@ models:
       id: { int: [1, 50] }
       feed_id: { int: [1, 50] }
       title: { loremWords: [2, 5] }
-      feed_url: url
-      site_url: url
+      feed_url: URL
+      site_url: URL
       last_updated: { dateTime: [2024-01-01, 2024-12-31] }
 
   Icon:
