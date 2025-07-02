@@ -6,8 +6,8 @@ models:
       feed_id: { int: [1, 50] }
       title: { loremWords: [3, 8] }
       author: name
-      summary: { loremParagraphs: [12000, 48000]}
-      content: { loremParagraphs: [120000, 480000]}
+      summary: { loremParagraphs: [12, 480]}
+      content: { loremParagraphs: [12000, 48000]}
       url: URL
       extracted_content_url: URL
       published: { dateTime: [2025-06-01, 2025-07-01] }
