@@ -198,9 +198,22 @@ function processNewItem(feedItem, starredEntries = [], unreadEntries = []) {
   }
 
   // Feed Information + Icon
-  const subscriptionInformation = JSON.parse(
-    getItem(`feed-${feedItem.feed_id}`)
-  );
+  const subscriptionRaw = getItem(`feed-${feedItem.feed_id}`);
+  let subscriptionInformation = null;
+
+  // Avoid JSON.parse on undefined / "undefined" / empty
+  if (subscriptionRaw && subscriptionRaw !== "undefined") {
+    try {
+      subscriptionInformation = JSON.parse(subscriptionRaw);
+    } catch (e) {
+      console.error(
+        "Failed to parse subscription info for feed",
+        feedItem.feed_id,
+        e
+      );
+      subscriptionInformation = null;
+    }
+  }
 
   if (subscriptionInformation?.title) {
     let annotation = Annotation.createWithText(subscriptionInformation.title);
