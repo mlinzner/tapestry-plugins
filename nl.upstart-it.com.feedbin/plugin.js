@@ -8,22 +8,15 @@ var lastUpdate = null;
 var lastSubscriptionUpdate = null;
 var feedInformation = {};
 
-function verify() {
-  sendRequest(HOST + "/authentication.json", "GET", null, AUTH_HEADERS)
-    .then(() => {
-      processVerification({});
-    })
-    .catch((requestError) => {
-      processError(requestError);
-    });
+async function verify() {
+  await fetch.get(HOST + "/authentication.json", { headers: AUTH_HEADERS });
+  return {};
 }
 
 async function load() {
-  if (lastUpdate === null) {
-    lastUpdate = new Date(new Date().getTime() - 7 * 24 * 60 * 60 * 1000); // Initial fetch: Looking back to maximum 7 days.
-  } else {
-    lastUpdate = new Date(lastUpdate - 4 * 60 * 60 * 1000); // lastUpdate - 4 hours to update items recently interacted with in a different app
-  }
+  const since = lastUpdate === null
+    ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Initial fetch: maximum 7 days.
+    : new Date(lastUpdate - 4 * 60 * 60 * 1000); // Refresh recently interacted-with items.
 
   if (
     lastSubscriptionUpdate === null ||
@@ -33,27 +26,17 @@ async function load() {
     lastSubscriptionUpdate = new Date();
   }
 
-  let requestParams = `since=${formatDateToISOWithMicroseconds(lastUpdate)}`;
+  let requestParams = `since=${formatDateToISOWithMicroseconds(since)}`;
 
   // Fetch current list of starred entries
-  const starred = await sendRequest(
-    `${HOST}/starred_entries.json`,
-    "GET",
-    null,
-    AUTH_HEADERS,
-    true
-  );
-  const parsedStarred = JSON.parse(starred);
+  const starred = await fetch.get(`${HOST}/starred_entries.json`, {
+    headers: AUTH_HEADERS,
+  }).json();
 
   // Fetch current list of unread entries
-  const unread = await sendRequest(
-    `${HOST}/unread_entries.json`,
-    "GET",
-    null,
-    AUTH_HEADERS,
-    true
-  );
-  const parsedUnread = JSON.parse(unread);
+  const unread = await fetch.get(`${HOST}/unread_entries.json`, {
+    headers: AUTH_HEADERS,
+  }).json();
 
   if (fetchUnreadOnly === "on") {
     requestParams += `&read=false`;
@@ -63,118 +46,60 @@ async function load() {
   let url = HOST + `/entries.json?${requestParams}&page=1`;
 
   while (url) {
-    try {
-      const resp = await sendRequest(url, "GET", null, AUTH_HEADERS, true);
-      const parsedResponse = JSON.parse(resp);
-      const { headers, body, ...rest } = parsedResponse;
-      newEntries.push(...JSON.parse(body));
-      url = parseLinkHeader(headers?.links).next || null;
-    } catch (error) {
-      console.error(`Error while requesting page from API`);
-      url = null;
-    }
+    const response = await fetch.get(url, { headers: AUTH_HEADERS });
+    newEntries.push(...await response.json());
+    url = parseLinkHeader(response.headers.get("Link")).next || null;
   }
 
-  let items = [];
-  newEntries
+  const items = newEntries
     .filter((feedItem) => feedItem?.url !== undefined)
-    .map((feedItem) => {
-      items.push(
-        processNewItem(
-          feedItem,
-          JSON.parse(parsedStarred.body),
-          JSON.parse(parsedUnread.body)
-        )
-      );
-    });
-  processResults(items);
+    .map((feedItem) => processNewItem(feedItem, starred, unread));
 
   lastUpdate = new Date();
+  return items;
 }
 
-function performAction(actionId, actionValue, item) {
-  let actions = item.actions;
+async function performAction(actionId, item, actionValue) {
+  // Older timeline items carry their entry ID in actionValue instead of metadata.
+  const entryId = Number(item.metadata?.id ?? actionValue);
+  if (!Number.isSafeInteger(entryId) || entryId <= 0) {
+    throw new Error("Missing or invalid Feedbin entry ID");
+  }
 
   if (actionId == "star") {
-    // Mark as Starred
-    sendRequest(
-      HOST + `/starred_entries.json`,
-      "POST",
-      JSON.stringify({ starred_entries: [actionValue] }),
-      AUTH_HEADERS,
-      true
-    )
-      .then((_) => {
-        delete actions["star"];
-        actions["unstar"] = actionValue;
-
-        item.actions = actions;
-        actionComplete(item, null);
-      })
-      .catch((error) => {
-        actionComplete(null, error);
-      });
+    await fetch.post(HOST + "/starred_entries.json", {
+      json: { starred_entries: [entryId] },
+      headers: AUTH_HEADERS,
+    });
+    item.actions.delete("star");
+    item.actions.add("unstar");
   } else if (actionId == "unstar") {
-    // Remove Star
-    sendRequest(
-      HOST + `/starred_entries/delete.json`,
-      "POST",
-      JSON.stringify({ starred_entries: [actionValue] }),
-      AUTH_HEADERS,
-      true
-    )
-      .then((_) => {
-        delete actions["unstar"];
-        actions["star"] = actionValue;
-
-        item.actions = actions;
-        actionComplete(item, null);
-      })
-      .catch((error) => {
-        actionComplete(null, error);
-      });
+    await fetch.post(HOST + "/starred_entries/delete.json", {
+      json: { starred_entries: [entryId] },
+      headers: AUTH_HEADERS,
+    });
+    item.actions.delete("unstar");
+    item.actions.add("star");
   } else if (actionId == "read") {
-    // Mark as read
-    sendRequest(
-      HOST + `/unread_entries.json`,
-      "POST",
-      JSON.stringify({ unread_entries: [actionValue] }),
-      AUTH_HEADERS,
-      true
-    )
-      .then((_) => {
-        delete actions["read"];
-        actions["unread"] = actionValue;
-
-        item.actions = actions;
-        actionComplete(item, null);
-      })
-      .catch((error) => {
-        actionComplete(null, error);
-      });
+    await fetch.post(HOST + "/unread_entries.json", {
+      json: { unread_entries: [entryId] },
+      headers: AUTH_HEADERS,
+    });
+    item.actions.delete("read");
+    item.actions.add("unread");
   } else if (actionId == "unread") {
-    // Mark as unread
-    sendRequest(
-      HOST + `/unread_entries/delete.json`,
-      "POST",
-      JSON.stringify({ unread_entries: [actionValue] }),
-      AUTH_HEADERS,
-      true
-    )
-      .then((_) => {
-        delete actions["unread"];
-        actions["read"] = actionValue;
-
-        item.actions = actions;
-        actionComplete(item, null);
-      })
-      .catch((error) => {
-        actionComplete(null, error);
-      });
+    await fetch.post(HOST + "/unread_entries/delete.json", {
+      json: { unread_entries: [entryId] },
+      headers: AUTH_HEADERS,
+    });
+    item.actions.delete("unread");
+    item.actions.add("read");
   } else {
-    let error = new Error(`actionId "${actionId}" not implemented`);
-    actionComplete(null, error);
+    throw new Error(`actionId "${actionId}" not implemented`);
   }
+
+  item.metadata = { ...item.metadata, id: String(entryId) };
+  return item;
 }
 
 function processNewItem(feedItem, starredEntries = [], unreadEntries = []) {
@@ -225,21 +150,22 @@ function processNewItem(feedItem, starredEntries = [], unreadEntries = []) {
   }
 
   // Actions
-  let actions = {};
+  let actions = new Set();
 
   if (starredEntries.includes(feedItem.id)) {
-    actions["unstar"] = feedItem.id;
+    actions.add("unstar");
   } else {
-    actions["star"] = feedItem.id;
+    actions.add("star");
   }
 
   if (unreadEntries.includes(feedItem.id)) {
-    actions["unread"] = feedItem.id;
+    actions.add("unread");
   } else {
-    actions["read"] = feedItem.id;
+    actions.add("read");
   }
 
   item.actions = actions;
+  item.metadata = { id: String(feedItem.id) };
   console.log("Finish processing");
   return item;
 }
@@ -253,21 +179,13 @@ async function updateSubscriptions() {
     )}`;
   }
 
-  const icons = await sendRequest(
-    `${HOST}/icons.json?${requestParams}`,
-    "GET",
-    null,
-    subscriptionUpdateHeaders
-  );
-  const parsedIcons = JSON.parse(icons);
+  const parsedIcons = await fetch.get(`${HOST}/icons.json?${requestParams}`, {
+    headers: subscriptionUpdateHeaders,
+  }).json();
 
-  const subscriptions = await sendRequest(
-    `${HOST}/subscriptions.json?${requestParams}`,
-    "GET",
-    null,
-    subscriptionUpdateHeaders
-  );
-  const parsedSubscriptions = JSON.parse(subscriptions);
+  const parsedSubscriptions = await fetch.get(`${HOST}/subscriptions.json?${requestParams}`, {
+    headers: subscriptionUpdateHeaders,
+  }).json();
   parsedSubscriptions.map((subscription) => {
     const host = getHostname(subscription.site_url);
     setItem(
