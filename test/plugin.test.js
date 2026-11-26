@@ -23,6 +23,11 @@ function connector({ storage = new Map(), unreadOnly = "off" } = {}) {
     calls.push({ method, url, ...options });
     const response = async () => {
       if (state.fail && url.includes(state.fail)) throw new Error("HTTP 503");
+      if (method === "POST" && parsed.pathname.endsWith("/unread_entries/delete.json")) {
+        state.unread = state.unread.filter((id) => !options.json.unread_entries.includes(id));
+      } else if (method === "POST" && parsed.pathname.endsWith("/unread_entries.json")) {
+        state.unread = [...new Set([...state.unread, ...options.json.unread_entries])];
+      }
       let body = [];
       let link = null;
       if (parsed.pathname.endsWith("/starred_entries.json")) body = state.starred;
@@ -164,4 +169,125 @@ test("invalid IDs and unknown actions fail without sending a request", async () 
   await assert.rejects(context.performAction("star", { actions: new Set() }), /entry ID/);
   await assert.rejects(context.performAction("unknown", { metadata: { id: "1" } }), /not implemented/);
   assert.equal(calls.length, 0);
+});
+
+test("mark as read removes the item on the next unread-only refresh", async () => {
+  const { context, state, calls, storage } = connector({ unreadOnly: "on" });
+  const [item] = await context.load();
+  assert.equal(new URL(calls.find((call) => call.url.includes("/entries.json?")).url).searchParams.get("read"), "false");
+  assert.equal(await context.performAction("read", item), item);
+  assert.deepEqual(state.unread, []);
+  state.entries = []; // Feedbin's read=false response no longer includes the item.
+  assert.deepEqual(plain(await context.load()), [{ deleted: true, uri: item.uri }]);
+  assert.deepEqual(JSON.parse(storage.get("entry-uris")), {});
+  assert.deepEqual(plain(await context.load()), []);
+});
+
+test("external read changes remove older items even after a connector restart", async () => {
+  const first = connector({ unreadOnly: "on" });
+  first.state.entries = [entry(1), entry(2)];
+  first.state.unread = [1, 2];
+  await first.context.load();
+  const restarted = connector({ unreadOnly: "on", storage: first.storage });
+  restarted.state.entries = []; // Both entries have fallen outside the fetch window.
+  restarted.state.unread = [2];
+  assert.deepEqual(plain(await restarted.context.load()), [{ deleted: true, uri: entry(1).url }]);
+  assert.deepEqual(JSON.parse(first.storage.get("entry-uris")), { 2: entry(2).url });
+});
+
+test("marking read then unread before refreshing cancels removal", async () => {
+  const { context, state } = connector({ unreadOnly: "on" });
+  const [item] = await context.load();
+  await context.performAction("read", item);
+  await context.performAction("unread", item);
+  state.entries = [];
+  assert.deepEqual(plain(await context.load()), []);
+});
+
+test("read actions on legacy items register their URI for refresh removal", async () => {
+  const { context, state } = connector({ unreadOnly: "on" });
+  const item = { uri: entry(1).url, actions: new Set(["read"]) };
+  await context.performAction("read", item, "1");
+  state.entries = [];
+  assert.deepEqual(plain(await context.load()), [{ deleted: true, uri: item.uri }]);
+});
+
+test("all-items mode retains read entries and does not emit removals", async () => {
+  const { context, state, storage } = connector();
+  const [item] = await context.load();
+  await context.performAction("read", item);
+  const items = await context.load();
+  assert.equal(items.length, 1);
+  assert.equal(items[0].uri, item.uri);
+  assert.ok(items[0].actions.has("unread"));
+  assert.equal(items[0].deleted, undefined);
+  assert.equal(storage.has("entry-uris"), false);
+});
+
+for (const failure of ["unread_entries.json", "page=2"]) {
+  test(`failed ${failure} fetch preserves pending removals for retry`, async () => {
+    const { context, state, storage } = connector({ unreadOnly: "on" });
+    await context.load();
+    const previous = storage.get("entry-uris");
+    const previousUpdate = context.lastUpdate;
+    state.entries = [];
+    state.nextEntries = [];
+    state.unread = [];
+    state.fail = failure;
+    await assert.rejects(context.load(), /HTTP 503/);
+    assert.equal(storage.get("entry-uris"), previous);
+    assert.equal(context.lastUpdate, previousUpdate);
+    state.fail = null;
+    assert.deepEqual(plain(await context.load()), [{ deleted: true, uri: entry(1).url }]);
+  });
+}
+
+test("a failed read action leaves the item unread and tracked", async () => {
+  const { context, state, storage } = connector({ unreadOnly: "on" });
+  const [item] = await context.load();
+  const previous = storage.get("entry-uris");
+  state.fail = "unread_entries/delete.json";
+  await assert.rejects(context.performAction("read", item), /HTTP 503/);
+  assert.ok(item.actions.has("read"));
+  assert.equal(storage.get("entry-uris"), previous);
+  state.fail = null;
+  const items = await context.load();
+  assert.equal(items.length, 1);
+  assert.equal(items[0].deleted, undefined);
+});
+
+test("read entries in a stale page produce only removals, not replacement items", async () => {
+  const { context, state } = connector({ unreadOnly: "on" });
+  state.unread = [];
+  assert.deepEqual(plain(await context.load()), [{ deleted: true, uri: entry(1).url }]);
+});
+
+test("invalid unread snapshots cannot clear tracked items", async () => {
+  const { context, state, storage } = connector({ unreadOnly: "on" });
+  await context.load();
+  const previous = storage.get("entry-uris");
+  for (const invalid of [null, {}, "[]", ["1"]]) {
+    state.unread = invalid;
+    await assert.rejects(context.load(), /Invalid Feedbin unread entry list/);
+    assert.equal(storage.get("entry-uris"), previous);
+  }
+});
+
+test("a shared article URI stays visible while another entry is unread", async () => {
+  const { context, state } = connector({ unreadOnly: "on" });
+  state.entries = [entry(1), { ...entry(2), url: entry(1).url }];
+  state.unread = [1, 2];
+  await context.load();
+  state.entries = [];
+  state.unread = [2];
+  assert.deepEqual(plain(await context.load()), []);
+  state.unread = [];
+  assert.deepEqual(plain(await context.load()), [{ deleted: true, uri: entry(1).url }]);
+});
+
+test("a rejected storage write fails visibly rather than losing removal tracking", async () => {
+  const { context, storage } = connector({ unreadOnly: "on" });
+  storage.set = () => {}; // Tapestry silently rejects writes when storage is full.
+  await assert.rejects(context.load(), /storage is full/);
+  assert.equal(context.lastUpdate, null);
 });

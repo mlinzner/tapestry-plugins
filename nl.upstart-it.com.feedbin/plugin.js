@@ -37,6 +37,9 @@ async function load() {
   const unread = await fetch.get(`${HOST}/unread_entries.json`, {
     headers: AUTH_HEADERS,
   }).json();
+  if (!Array.isArray(unread) || unread.some((id) => !Number.isSafeInteger(id))) {
+    throw new Error("Invalid Feedbin unread entry list");
+  }
 
   if (fetchUnreadOnly === "on") {
     requestParams += `&read=false`;
@@ -51,9 +54,30 @@ async function load() {
     url = parseLinkHeader(response.headers.get("Link")).next || null;
   }
 
-  const items = newEntries
-    .filter((feedItem) => feedItem?.url !== undefined)
+  let items = newEntries
+    .filter((feedItem) => typeof feedItem?.url === "string" && feedItem.url.length > 0)
     .map((feedItem) => processNewItem(feedItem, starred, unread));
+
+  if (fetchUnreadOnly === "on") {
+    const unreadIds = new Set(unread.map(String));
+    const entryURIs = JSON.parse(getItem("entry-uris") || "{}");
+    for (const item of items) {
+      entryURIs[item.metadata.id] = item.uri;
+    }
+
+    items = items.filter((item) => unreadIds.has(item.metadata.id));
+    const unreadURIs = new Set(Object.entries(entryURIs)
+      .filter(([id]) => unreadIds.has(id))
+      .map(([, uri]) => uri));
+    // Omitted results do not remove cached timeline items; report explicit removals.
+    for (const [id, uri] of Object.entries(entryURIs)) {
+      if (!unreadIds.has(id)) {
+        if (!unreadURIs.has(uri)) items.push(Item.delete(uri));
+        delete entryURIs[id];
+      }
+    }
+    saveEntryURIs(entryURIs);
+  }
 
   lastUpdate = new Date();
   return items;
@@ -98,8 +122,22 @@ async function performAction(actionId, item, actionValue) {
     throw new Error(`actionId "${actionId}" not implemented`);
   }
 
+  if (fetchUnreadOnly === "on" && (actionId === "read" || actionId === "unread")) {
+    const entryURIs = JSON.parse(getItem("entry-uris") || "{}");
+    entryURIs[entryId] = item.uri;
+    saveEntryURIs(entryURIs);
+  }
   item.metadata = { ...item.metadata, id: String(entryId) };
   return item;
+}
+
+function saveEntryURIs(entryURIs) {
+  const value = JSON.stringify(entryURIs);
+  setItem("entry-uris", value);
+  // Tapestry silently ignores writes exceeding its 100,000-character storage limit.
+  if (getItem("entry-uris") !== value) {
+    throw new Error("Tapestry storage is full; cannot track Feedbin read-state removals");
+  }
 }
 
 function processNewItem(feedItem, starredEntries = [], unreadEntries = []) {
