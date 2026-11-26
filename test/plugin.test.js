@@ -118,6 +118,31 @@ for (const [action, endpoint, inverse] of [
   });
 }
 
+test("read/unread actions describe the operation, not the current state", async () => {
+  const { context, state } = connector();
+  state.entries = [entry(1), entry(2)];
+  const items = await context.load();
+  assert.ok(items[0].actions.has("read"));
+  assert.ok(!items[0].actions.has("unread"));
+  assert.ok(items[1].actions.has("unread"));
+  assert.ok(!items[1].actions.has("read"));
+});
+
+for (const [action, endpoint, inverse] of [
+  ["read", "unread_entries/delete.json", "unread"],
+  ["unread", "unread_entries.json", "read"],
+]) {
+  test(`${action} updates Feedbin and offers the inverse action`, async () => {
+    const { context, calls } = connector();
+    const item = { uri: entry(1).url, metadata: { id: "1" }, actions: new Set([action]) };
+    assert.equal(await context.performAction(action, item), item);
+    assert.equal(calls[0].method, "POST");
+    assert.equal(calls[0].url, `${HOST}/${endpoint}`);
+    assert.deepEqual(plain(calls[0].json), { unread_entries: [1] });
+    assert.deepEqual([...item.actions], [inverse]);
+  });
+}
+
 test("actions support IDs on pre-2.0 timeline items", async () => {
   const { context, calls } = connector();
   const item = { actions: new Set(["star"]) };

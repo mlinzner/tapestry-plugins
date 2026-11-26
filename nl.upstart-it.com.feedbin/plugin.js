@@ -81,14 +81,14 @@ async function performAction(actionId, item, actionValue) {
     item.actions.delete("unstar");
     item.actions.add("star");
   } else if (actionId == "read") {
-    await fetch.post(HOST + "/unread_entries.json", {
+    await fetch.post(HOST + "/unread_entries/delete.json", {
       json: { unread_entries: [entryId] },
       headers: AUTH_HEADERS,
     });
     item.actions.delete("read");
     item.actions.add("unread");
   } else if (actionId == "unread") {
-    await fetch.post(HOST + "/unread_entries/delete.json", {
+    await fetch.post(HOST + "/unread_entries.json", {
       json: { unread_entries: [entryId] },
       headers: AUTH_HEADERS,
     });
@@ -159,9 +159,9 @@ function processNewItem(feedItem, starredEntries = [], unreadEntries = []) {
   }
 
   if (unreadEntries.includes(feedItem.id)) {
-    actions.add("unread");
-  } else {
     actions.add("read");
+  } else {
+    actions.add("unread");
   }
 
   item.actions = actions;
